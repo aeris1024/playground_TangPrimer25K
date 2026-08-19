@@ -30,7 +30,7 @@ class FpgaCliTests(unittest.TestCase):
             'clock_hz = 100\nprogrammer_device = "TEST-DEVICE"\n'
             'programmer_cable = "USB Debugger A"\nprogrammer_cable_index = 4\n'
             'use_sspi_as_gpio = false\nuse_cpu_as_gpio = false\n'
-            'use_ready_as_gpio = false\n',
+            'use_ready_as_gpio = false\nuse_done_as_gpio = false\n',
             encoding="utf-8",
         )
         (design_dir / "rtl" / "top.sv").write_text("module top; endmodule\n", encoding="utf-8")
@@ -45,7 +45,10 @@ class FpgaCliTests(unittest.TestCase):
 
     def test_repository_manifest_loads(self) -> None:
         designs = fpga.discover_designs(MODULE_PATH.parents[1])
-        self.assertIn("001_blink", designs)
+        self.assertEqual(
+            set(designs),
+            {"001_blink", "002_button", "003_uart_tx", "004_pll", "005_bram"},
+        )
         self.assertEqual(designs["001_blink"].top, "top")
 
     def test_unknown_manifest_key_is_rejected(self) -> None:
@@ -83,6 +86,7 @@ class FpgaCliTests(unittest.TestCase):
         self.assertIn("set_option -use_sspi_as_gpio 1", text)
         self.assertIn("set_option -use_cpu_as_gpio 1", text)
         self.assertIn("set_option -use_ready_as_gpio 1", text)
+        self.assertIn("set_option -use_done_as_gpio 1", text)
         self.assertIn("import_files -file", text)
         self.assertIn("run all", text)
         self.assertIn("{C:/build folder/gowin_project}", text)

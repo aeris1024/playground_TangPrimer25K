@@ -33,6 +33,7 @@ BOARD_KEYS = {
     "use_sspi_as_gpio",
     "use_cpu_as_gpio",
     "use_ready_as_gpio",
+    "use_done_as_gpio",
 }
 
 
@@ -52,6 +53,7 @@ class Board:
     use_sspi_as_gpio: bool
     use_cpu_as_gpio: bool
     use_ready_as_gpio: bool
+    use_done_as_gpio: bool
     manifest: Path
 
 
@@ -139,10 +141,16 @@ def load_board(name: str, root: Path = ROOT) -> Board:
     use_sspi_as_gpio = data.get("use_sspi_as_gpio")
     use_cpu_as_gpio = data.get("use_cpu_as_gpio")
     use_ready_as_gpio = data.get("use_ready_as_gpio")
+    use_done_as_gpio = data.get("use_done_as_gpio")
     programmer_cable_index = data.get("programmer_cable_index")
     if not all(
         isinstance(value, bool)
-        for value in (use_sspi_as_gpio, use_cpu_as_gpio, use_ready_as_gpio)
+        for value in (
+            use_sspi_as_gpio,
+            use_cpu_as_gpio,
+            use_ready_as_gpio,
+            use_done_as_gpio,
+        )
     ):
         raise FpgaError(
             f"{manifest}: dual-purpose GPIO settings must be booleans"
@@ -160,6 +168,7 @@ def load_board(name: str, root: Path = ROOT) -> Board:
         use_sspi_as_gpio=use_sspi_as_gpio,
         use_cpu_as_gpio=use_cpu_as_gpio,
         use_ready_as_gpio=use_ready_as_gpio,
+        use_done_as_gpio=use_done_as_gpio,
         manifest=manifest,
     )
     if board.name != name:
@@ -320,6 +329,7 @@ def generate_gowin_tcl(design: Design, board: Board, output_dir: Path) -> str:
             f"set_option -use_sspi_as_gpio {int(board.use_sspi_as_gpio)}",
             f"set_option -use_cpu_as_gpio {int(board.use_cpu_as_gpio)}",
             f"set_option -use_ready_as_gpio {int(board.use_ready_as_gpio)}",
+            f"set_option -use_done_as_gpio {int(board.use_done_as_gpio)}",
             "run all",
         ]
     )

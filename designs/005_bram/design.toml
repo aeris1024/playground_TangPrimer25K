@@ -1,0 +1,6 @@
+name = "005_bram"
+board = "tang_primer_25k"
+top = "top"
+sources = ["rtl/single_port_ram.sv", "rtl/top.sv"]
+constraints = ["constraints/bram.cst", "constraints/bram.sdc"]
+testbench = "sim/tb_top.sv"

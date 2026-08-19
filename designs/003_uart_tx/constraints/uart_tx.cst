@@ -1,0 +1,6 @@
+// 50 MHz oscillator and TX input of the Dock's on-board USB-UART bridge.
+IO_LOC "clk" E2;
+IO_PORT "clk" IO_TYPE=LVCMOS33 PULL_MODE=DOWN DRIVE=OFF BANK_VCCIO=3.3;
+
+IO_LOC "uart_tx_pin" C3;
+IO_PORT "uart_tx_pin" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;

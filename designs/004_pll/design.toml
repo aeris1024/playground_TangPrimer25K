@@ -1,0 +1,6 @@
+name = "004_pll"
+board = "tang_primer_25k"
+top = "top"
+sources = ["rtl/pll_50_to_100.sv", "rtl/top.sv"]
+constraints = ["constraints/pll.cst", "constraints/pll.sdc"]
+testbench = "sim/tb_top.sv"

@@ -1,7 +1,7 @@
 # 001_blink
 
-The first hardware smoke test for the Tang Primer 25K Dock. The 27 MHz input
-clock drives a counter that toggles the on-board LED every 13,500,000 cycles,
+The first hardware smoke test for the Tang Primer 25K Dock. The 50 MHz input
+clock drives a counter that toggles the READY LED every 25,000,000 cycles,
 giving a complete on/off cycle of approximately one second.
 
 ```powershell

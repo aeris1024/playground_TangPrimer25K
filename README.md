@@ -4,14 +4,15 @@ Tang Primer 25K Core + Dockを、AI AgentからCLI中心で操作するための
 FPGA実験リポジトリです。各実験は独立したmanifestを持ち、同じコマンドで
 シミュレーション、Gowinビルド、実機書き込みを行います。
 
-現在の初期マイルストーンは、内蔵LEDを約1 Hzで点滅させる`001_blink`です。
+番号付きの独立設計で、LED、ボタン、UART、PLL、オンチップBSRAMを
+段階的に検証できます。
 
 ## 必要なもの
 
 - Windows 10/11
 - Python 3.11以上
 - Gowin EDA Education 1.9.9 Beta-4以上（ライセンス不要版）
-- Gowin Programmer（V1.9.12.03で動作確認）
+- Gowin Programmer（V1.9.11.03 Educationで動作確認）
 - Icarus Verilog（`iverilog`と`vvp`）
 - Tang Primer 25K Core + Dock、データ通信対応USB-Cケーブル
 
@@ -51,6 +52,17 @@ $env:TANG_IVERILOG = 'C:\path\to\iverilog.exe'
 .\fpga.ps1 clean 001_blink
 ```
 
+ボタン入力の実験は設計名を`002_button`へ置き換えて同じ順序で実行します。
+書き込み後は、S1がREADY LED、S2がDONE LEDを押している間だけ点灯させます。
+
+実装済み設計は次のとおりです。
+
+- `001_blink`: READY LEDを約1 Hzで点滅
+- `002_button`: S1/S2をREADY/DONE LEDへ反映
+- `003_uart_tx`: オンボードUSB-UARTへ115200 baudで周期送信
+- `004_pll`: 50 MHzから100 MHzを生成しLOCKとheartbeatを表示
+- `005_bram`: 1024×16 bit BSRAMの起動時write/read BIST
+
 `program`はGowin純正`programmer_cli.exe`を使い、電源断で消えるSRAMへ
 `--device GW5A-25A --run 2`で書き込みます。不揮発Flash書き込みは誤操作を避けるため、
 現在のCLIでは無効です。
@@ -78,7 +90,7 @@ name = "001_blink"
 board = "tang_primer_25k"
 top = "top"
 sources = ["rtl/top.sv"]
-constraints = ["constraints/blink.cst"]
+constraints = ["constraints/blink.cst", "constraints/blink.sdc"]
 testbench = "sim/tb_top.sv"
 ```
 
@@ -109,8 +121,8 @@ python -m unittest discover -s tests -v
 
 ## ロードマップ
 
-1. 基盤と`001_blink`
-2. `002_button`、`003_uart_tx`、`004_pll`、`005_bram`
+1. 基盤と`001_blink`（完了）
+2. `002_button`、`003_uart_tx`、`004_pll`、`005_bram`（実装済み）
 3. `006_sdram_init`、`007_sdram_bist`、`008_sdram_burst`、`009_sdram_uart`
 4. FIFO、SPI、I2S、DDS、FIR/IIR、FFT、DMA、softcore
 5. 実験用のYosys + nextpnr-gowin + Apicula backend

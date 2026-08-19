@@ -1,0 +1,6 @@
+name = "002_button"
+board = "tang_primer_25k"
+top = "top"
+sources = ["rtl/top.sv"]
+constraints = ["constraints/button.cst"]
+testbench = "sim/tb_top.sv"

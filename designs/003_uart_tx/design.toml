@@ -1,0 +1,6 @@
+name = "003_uart_tx"
+board = "tang_primer_25k"
+top = "top"
+sources = ["rtl/uart_tx.sv", "rtl/top.sv"]
+constraints = ["constraints/uart_tx.cst", "constraints/uart_tx.sdc"]
+testbench = "sim/tb_top.sv"

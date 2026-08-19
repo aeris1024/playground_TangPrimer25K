@@ -1,5 +1,5 @@
 module top #(
-    parameter integer HALF_PERIOD_CYCLES = 13_500_000
+    parameter integer HALF_PERIOD_CYCLES = 25_000_000
 ) (
     input  wire clk,
     output wire led
