@@ -1,6 +1,6 @@
-// Tang Primer 25K Dock: 27 MHz oscillator and on-board LED.
+// Tang Primer 25K Dock: 27 MHz oscillator and READY status LED.
 IO_LOC "clk" E2;
 IO_PORT "clk" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=OFF BANK_VCCIO=3.3;
 
-IO_LOC "led" L6;
+IO_LOC "led" E8;
 IO_PORT "led" IO_TYPE=LVCMOS33 PULL_MODE=NONE DRIVE=8 BANK_VCCIO=3.3;

@@ -7,3 +7,4 @@ programmer_cable = "USB Debugger A"
 programmer_cable_index = 4
 use_sspi_as_gpio = true
 use_cpu_as_gpio = true
+use_ready_as_gpio = true

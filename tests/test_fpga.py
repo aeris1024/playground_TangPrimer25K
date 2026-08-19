@@ -29,7 +29,8 @@ class FpgaCliTests(unittest.TestCase):
             'name = "test_board"\ndevice = "TEST-PART"\ndevice_version = "A"\n'
             'clock_hz = 100\nprogrammer_device = "TEST-DEVICE"\n'
             'programmer_cable = "USB Debugger A"\nprogrammer_cable_index = 4\n'
-            'use_sspi_as_gpio = false\nuse_cpu_as_gpio = false\n',
+            'use_sspi_as_gpio = false\nuse_cpu_as_gpio = false\n'
+            'use_ready_as_gpio = false\n',
             encoding="utf-8",
         )
         (design_dir / "rtl" / "top.sv").write_text("module top; endmodule\n", encoding="utf-8")
@@ -78,8 +79,10 @@ class FpgaCliTests(unittest.TestCase):
         text = fpga.generate_gowin_tcl(design, board, Path("C:/build folder"))
         self.assertIn(board.device, text)
         self.assertIn("-device_version {A}", text)
+        self.assertIn("-force", text)
         self.assertIn("set_option -use_sspi_as_gpio 1", text)
         self.assertIn("set_option -use_cpu_as_gpio 1", text)
+        self.assertIn("set_option -use_ready_as_gpio 1", text)
         self.assertIn("import_files -file", text)
         self.assertIn("run all", text)
         self.assertIn("{C:/build folder/gowin_project}", text)
@@ -110,7 +113,7 @@ class FpgaCliTests(unittest.TestCase):
         output = (
             " Cable found:  USB Debugger A/0/201746/null (USB location:201746)\n"
             " Cable found:  Other Cable/0/10/null (USB location:10)\n"
-            " Cable found:  USB Debugger A/1/201745/null (USB location:201745)\n"
+            " Cable found:  USB Debugger A/1/0/null (USB location:201745)\n"
         )
         self.assertEqual(
             fpga._parse_programmer_locations(output, "USB Debugger A"),
