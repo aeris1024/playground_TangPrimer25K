@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 from pathlib import Path
+import stat
 import sys
 import tempfile
 import unittest
@@ -24,7 +26,9 @@ class FpgaCliTests(unittest.TestCase):
         (design_dir / "sim").mkdir()
         board_dir.mkdir(parents=True)
         (board_dir / "board.toml").write_text(
-            'name = "test_board"\ndevice = "TEST-PART"\nclock_hz = 100\nprogrammer_device = "TEST-DEVICE"\n',
+            'name = "test_board"\ndevice = "TEST-PART"\ndevice_version = "A"\n'
+            'clock_hz = 100\nprogrammer_device = "TEST-DEVICE"\n'
+            'use_sspi_as_gpio = false\nuse_cpu_as_gpio = false\n',
             encoding="utf-8",
         )
         (design_dir / "rtl" / "top.sv").write_text("module top; endmodule\n", encoding="utf-8")
@@ -72,6 +76,9 @@ class FpgaCliTests(unittest.TestCase):
         board = fpga.load_board(design.board_name)
         text = fpga.generate_gowin_tcl(design, board, Path("C:/build folder"))
         self.assertIn(board.device, text)
+        self.assertIn("-device_version {A}", text)
+        self.assertIn("set_option -use_sspi_as_gpio 1", text)
+        self.assertIn("set_option -use_cpu_as_gpio 1", text)
         self.assertIn("import_files -file", text)
         self.assertIn("run all", text)
         self.assertIn("{C:/build folder/gowin_project}", text)
@@ -101,6 +108,7 @@ class FpgaCliTests(unittest.TestCase):
             second.mkdir()
             (first / "result.fs").touch()
             (second / "result.fs").touch()
+            os.chmod(first / "result.fs", stat.S_IREAD)
             removed = fpga.clean_outputs(build, "001_first", False)
             self.assertEqual(removed, [first.resolve()])
             self.assertFalse(first.exists())

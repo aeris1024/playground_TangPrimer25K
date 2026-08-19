@@ -2,5 +2,5 @@ name = "001_blink"
 board = "tang_primer_25k"
 top = "top"
 sources = ["rtl/top.sv"]
-constraints = ["constraints/blink.cst"]
+constraints = ["constraints/blink.cst", "constraints/blink.sdc"]
 testbench = "sim/tb_top.sv"

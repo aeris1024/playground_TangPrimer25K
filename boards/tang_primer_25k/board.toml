@@ -1,4 +1,7 @@
 name = "tang_primer_25k"
 device = "GW5A-LV25MG121NC1/I0"
+device_version = "A"
 clock_hz = 27000000
 programmer_device = "GW5A-25A"
+use_sspi_as_gpio = true
+use_cpu_as_gpio = true
