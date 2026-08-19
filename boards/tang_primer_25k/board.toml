@@ -3,5 +3,7 @@ device = "GW5A-LV25MG121NC1/I0"
 device_version = "A"
 clock_hz = 27000000
 programmer_device = "GW5A-25A"
+programmer_cable = "USB Debugger A"
+programmer_cable_index = 4
 use_sspi_as_gpio = true
 use_cpu_as_gpio = true

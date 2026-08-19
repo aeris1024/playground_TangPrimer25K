@@ -28,6 +28,7 @@ class FpgaCliTests(unittest.TestCase):
         (board_dir / "board.toml").write_text(
             'name = "test_board"\ndevice = "TEST-PART"\ndevice_version = "A"\n'
             'clock_hz = 100\nprogrammer_device = "TEST-DEVICE"\n'
+            'programmer_cable = "USB Debugger A"\nprogrammer_cable_index = 4\n'
             'use_sspi_as_gpio = false\nuse_cpu_as_gpio = false\n',
             encoding="utf-8",
         )
@@ -85,7 +86,9 @@ class FpgaCliTests(unittest.TestCase):
 
     def test_program_command_uses_gowin_sram_mode(self) -> None:
         board = fpga.load_board("tang_primer_25k")
-        command = fpga.program_command(Path("programmer_cli.exe"), board, Path("blink.fs"))
+        command = fpga.program_command(
+            Path("programmer_cli.exe"), board, Path("blink.fs"), "201745"
+        )
         self.assertEqual(
             command,
             [
@@ -96,7 +99,22 @@ class FpgaCliTests(unittest.TestCase):
                 "2",
                 "--fsFile",
                 "blink.fs",
+                "--cable-index",
+                "4",
+                "--location",
+                "201745",
             ],
+        )
+
+    def test_programmer_locations_are_filtered_and_sorted(self) -> None:
+        output = (
+            " Cable found:  USB Debugger A/0/201746/null (USB location:201746)\n"
+            " Cable found:  Other Cable/0/10/null (USB location:10)\n"
+            " Cable found:  USB Debugger A/1/201745/null (USB location:201745)\n"
+        )
+        self.assertEqual(
+            fpga._parse_programmer_locations(output, "USB Debugger A"),
+            ["201745", "201746"],
         )
 
     def test_targeted_clean_preserves_other_designs(self) -> None:

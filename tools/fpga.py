@@ -7,6 +7,7 @@ import argparse
 import dataclasses
 import os
 from pathlib import Path
+import re
 import shutil
 import stat
 import subprocess
@@ -27,6 +28,8 @@ BOARD_KEYS = {
     "device_version",
     "clock_hz",
     "programmer_device",
+    "programmer_cable",
+    "programmer_cable_index",
     "use_sspi_as_gpio",
     "use_cpu_as_gpio",
 }
@@ -43,6 +46,8 @@ class Board:
     device_version: str
     clock_hz: int
     programmer_device: str
+    programmer_cable: str
+    programmer_cable_index: int
     use_sspi_as_gpio: bool
     use_cpu_as_gpio: bool
     manifest: Path
@@ -131,16 +136,21 @@ def load_board(name: str, root: Path = ROOT) -> Board:
         raise FpgaError(f"{manifest}: 'clock_hz' must be a positive integer")
     use_sspi_as_gpio = data.get("use_sspi_as_gpio")
     use_cpu_as_gpio = data.get("use_cpu_as_gpio")
+    programmer_cable_index = data.get("programmer_cable_index")
     if not isinstance(use_sspi_as_gpio, bool) or not isinstance(use_cpu_as_gpio, bool):
         raise FpgaError(
             f"{manifest}: 'use_sspi_as_gpio' and 'use_cpu_as_gpio' must be booleans"
         )
+    if not isinstance(programmer_cable_index, int) or isinstance(programmer_cable_index, bool):
+        raise FpgaError(f"{manifest}: 'programmer_cable_index' must be an integer")
     board = Board(
         name=_required_string(data, "name", manifest),
         device=_required_string(data, "device", manifest),
         device_version=_required_string(data, "device_version", manifest),
         clock_hz=clock_hz,
         programmer_device=_required_string(data, "programmer_device", manifest),
+        programmer_cable=_required_string(data, "programmer_cable", manifest),
+        programmer_cable_index=programmer_cable_index,
         use_sspi_as_gpio=use_sspi_as_gpio,
         use_cpu_as_gpio=use_cpu_as_gpio,
         manifest=manifest,
@@ -307,7 +317,7 @@ def generate_gowin_tcl(design: Design, board: Board, output_dir: Path) -> str:
     return "\n".join(lines) + "\n"
 
 
-def program_command(executable: Path, board: Board, bitstream: Path) -> list[str]:
+def program_command(executable: Path, board: Board, bitstream: Path, location: str) -> list[str]:
     return [
         str(executable),
         "--device",
@@ -316,13 +326,23 @@ def program_command(executable: Path, board: Board, bitstream: Path) -> list[str
         "2",
         "--fsFile",
         str(bitstream),
+        "--cable-index",
+        str(board.programmer_cable_index),
+        "--location",
+        location,
     ]
 
 
 def _run(command: Sequence[str], cwd: Path, log: Path | None = None, timeout: int | None = None) -> int:
     try:
         result = subprocess.run(
-            list(command), cwd=cwd, text=True, capture_output=True, timeout=timeout, check=False
+            list(command),
+            cwd=cwd,
+            stdin=subprocess.DEVNULL,
+            text=True,
+            capture_output=True,
+            timeout=timeout,
+            check=False,
         )
     except subprocess.TimeoutExpired as exc:
         raise FpgaError(f"Command timed out after {timeout} seconds: {command[0]}") from exc
@@ -348,7 +368,12 @@ def command_list(_: argparse.Namespace) -> int:
 def _version(path: Path, arguments: Sequence[str]) -> tuple[bool, str]:
     try:
         result = subprocess.run(
-            [str(path), *arguments], text=True, capture_output=True, timeout=10, check=False
+            [str(path), *arguments],
+            stdin=subprocess.DEVNULL,
+            text=True,
+            capture_output=True,
+            timeout=10,
+            check=False,
         )
     except (OSError, subprocess.TimeoutExpired):
         return False, "version unavailable"
@@ -359,7 +384,12 @@ def _version(path: Path, arguments: Sequence[str]) -> tuple[bool, str]:
 def _programmer_version(path: Path) -> tuple[bool, str]:
     try:
         result = subprocess.run(
-            [str(path), "--help"], text=True, capture_output=True, timeout=10, check=False
+            [str(path), "--help"],
+            stdin=subprocess.DEVNULL,
+            text=True,
+            capture_output=True,
+            timeout=10,
+            check=False,
         )
     except (OSError, subprocess.TimeoutExpired):
         return False, "version unavailable"
@@ -369,6 +399,60 @@ def _programmer_version(path: Path) -> tuple[bool, str]:
             return result.returncode == 0, line.strip()
     first_line = next((line.strip() for line in output.splitlines() if line.strip()), "version unavailable")
     return False, first_line
+
+
+def _capture(command: Sequence[str], timeout: int) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        list(command),
+        cwd=ROOT,
+        stdin=subprocess.DEVNULL,
+        text=True,
+        capture_output=True,
+        timeout=timeout,
+        check=False,
+    )
+
+
+def _parse_programmer_locations(output: str, cable_name: str) -> list[str]:
+    locations: set[str] = set()
+    pattern = re.compile(r"Cable found:\s+(.+?)/\d+/(\d+)/")
+    for match in pattern.finditer(output):
+        if match.group(1).strip() == cable_name:
+            locations.add(match.group(2))
+    return sorted(locations, key=int)
+
+
+def discover_programmer_location(programmer: Path, board: Board) -> tuple[str, str]:
+    try:
+        cables = _capture([str(programmer), "--scan-cables", "F"], timeout=10)
+    except subprocess.TimeoutExpired as exc:
+        raise FpgaError("Gowin Programmer timed out while listing USB cables") from exc
+    cable_output = (cables.stdout or "") + (cables.stderr or "")
+    if cables.returncode != 0:
+        raise FpgaError(f"Gowin Programmer could not list USB cables: {cable_output.strip()}")
+    locations = _parse_programmer_locations(cable_output, board.programmer_cable)
+    if not locations:
+        raise FpgaError(f"No '{board.programmer_cable}' cable was found")
+
+    for location in locations:
+        scan_command = [
+            str(programmer),
+            "--scan",
+            "--cable-index",
+            str(board.programmer_cable_index),
+            "--location",
+            location,
+        ]
+        try:
+            scan = _capture(scan_command, timeout=5)
+        except subprocess.TimeoutExpired:
+            continue
+        scan_output = (scan.stdout or "") + (scan.stderr or "")
+        if scan.returncode == 0 and "device(s) found!" in scan_output:
+            return location, scan_output
+    raise FpgaError(
+        f"No FPGA JTAG target was found on {board.programmer_cable} locations: {', '.join(locations)}"
+    )
 
 
 def command_doctor(_: argparse.Namespace) -> int:
@@ -399,15 +483,11 @@ def command_doctor(_: argparse.Namespace) -> int:
     if programmer:
         print(f"Hardware\tCHECK\tprobing {board.programmer_device} with Gowin Programmer...")
         try:
-            result = _run([str(programmer), "--scan"], ROOT, timeout=15)
+            location, _ = discover_programmer_location(programmer, board)
         except FpgaError as exc:
             print(f"Hardware\tFAIL\t{exc}")
             return 1
-        if result != 0:
-            print("Hardware\tFAIL\tconnect the Dock directly by USB and check its driver/firmware")
-            missing = True
-        else:
-            print("Hardware\tOK\tJTAG device detected")
+        print(f"Hardware\tOK\tJTAG device detected at USB location {location}")
     else:
         print("Hardware\tSKIP\tGowin Programmer is unavailable")
     return 1 if missing else 0
@@ -466,9 +546,11 @@ def command_program(args: argparse.Namespace) -> int:
             "Flash programming is not enabled for the Gowin backend yet. Use SRAM programming without --flash."
         )
     programmer = require_tool("programmer")
+    location, _ = discover_programmer_location(programmer, board)
     print("PROGRAM MODE\tSRAM (Gowin Programmer)")
+    print(f"PROGRAM CABLE\t{board.programmer_cable} at USB location {location}")
     log = BUILD_DIR / design.name / "program.log"
-    result = _run(program_command(programmer, board, bitstream), ROOT, log)
+    result = _run(program_command(programmer, board, bitstream, location), ROOT, log)
     if result != 0:
         raise FpgaError(
             f"Programming failed; see {log}. Check the USB cable, Dock firmware, and Windows driver."

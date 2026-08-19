@@ -7,6 +7,7 @@ Dock base board.
 - FPGA device version: `A`
 - Dock oscillator: 27 MHz
 - Gowin Programmer device name: `GW5A-25A`
+- Gowin Programmer cable: `USB Debugger A` (cable index 4); the CLI auto-detects its JTAG location.
 - Clock pin used by `001_blink`: E2
 - On-board LED pin used by `001_blink`: L6
 - E2 is enabled as a regular GPIO by releasing its CPU/SSPI dual-purpose functions.
