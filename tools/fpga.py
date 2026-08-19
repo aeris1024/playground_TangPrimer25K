@@ -31,6 +31,7 @@ BOARD_KEYS = {
     "programmer_cable",
     "programmer_cable_index",
     "use_sspi_as_gpio",
+    "use_i2c_as_gpio",
     "use_cpu_as_gpio",
     "use_ready_as_gpio",
     "use_done_as_gpio",
@@ -51,6 +52,7 @@ class Board:
     programmer_cable: str
     programmer_cable_index: int
     use_sspi_as_gpio: bool
+    use_i2c_as_gpio: bool
     use_cpu_as_gpio: bool
     use_ready_as_gpio: bool
     use_done_as_gpio: bool
@@ -117,14 +119,17 @@ def _reject_unknown(data: Mapping[str, object], allowed: set[str], path: Path) -
         raise FpgaError(f"{path}: unknown key(s): {', '.join(unknown)}")
 
 
-def _resolve_files(base: Path, entries: Iterable[str], manifest: Path) -> tuple[Path, ...]:
+def _resolve_files(
+    base: Path, entries: Iterable[str], manifest: Path, root: Path
+) -> tuple[Path, ...]:
     resolved: list[Path] = []
+    allowed_roots = (base.resolve(), (root / "common").resolve())
     for entry in entries:
         candidate = (base / entry).resolve()
-        try:
-            candidate.relative_to(base.resolve())
-        except ValueError as exc:
-            raise FpgaError(f"{manifest}: path escapes the design directory: {entry}") from exc
+        if not any(candidate.is_relative_to(allowed) for allowed in allowed_roots):
+            raise FpgaError(
+                f"{manifest}: path must stay in the design directory or common/: {entry}"
+            )
         if not candidate.is_file():
             raise FpgaError(f"{manifest}: referenced file not found: {entry}")
         resolved.append(candidate)
@@ -139,6 +144,7 @@ def load_board(name: str, root: Path = ROOT) -> Board:
     if not isinstance(clock_hz, int) or isinstance(clock_hz, bool) or clock_hz <= 0:
         raise FpgaError(f"{manifest}: 'clock_hz' must be a positive integer")
     use_sspi_as_gpio = data.get("use_sspi_as_gpio")
+    use_i2c_as_gpio = data.get("use_i2c_as_gpio")
     use_cpu_as_gpio = data.get("use_cpu_as_gpio")
     use_ready_as_gpio = data.get("use_ready_as_gpio")
     use_done_as_gpio = data.get("use_done_as_gpio")
@@ -147,6 +153,7 @@ def load_board(name: str, root: Path = ROOT) -> Board:
         isinstance(value, bool)
         for value in (
             use_sspi_as_gpio,
+            use_i2c_as_gpio,
             use_cpu_as_gpio,
             use_ready_as_gpio,
             use_done_as_gpio,
@@ -166,6 +173,7 @@ def load_board(name: str, root: Path = ROOT) -> Board:
         programmer_cable=_required_string(data, "programmer_cable", manifest),
         programmer_cable_index=programmer_cable_index,
         use_sspi_as_gpio=use_sspi_as_gpio,
+        use_i2c_as_gpio=use_i2c_as_gpio,
         use_cpu_as_gpio=use_cpu_as_gpio,
         use_ready_as_gpio=use_ready_as_gpio,
         use_done_as_gpio=use_done_as_gpio,
@@ -180,10 +188,10 @@ def load_design(manifest: Path, root: Path = ROOT) -> Design:
     data = _read_toml(manifest)
     _reject_unknown(data, DESIGN_KEYS, manifest)
     base = manifest.parent.resolve()
-    sources = _resolve_files(base, _string_list(data, "sources", manifest), manifest)
-    constraints = _resolve_files(base, _string_list(data, "constraints", manifest), manifest)
+    sources = _resolve_files(base, _string_list(data, "sources", manifest), manifest, root)
+    constraints = _resolve_files(base, _string_list(data, "constraints", manifest), manifest, root)
     testbench_entry = _required_string(data, "testbench", manifest)
-    testbench = _resolve_files(base, (testbench_entry,), manifest)[0]
+    testbench = _resolve_files(base, (testbench_entry,), manifest, root)[0]
     design = Design(
         name=_required_string(data, "name", manifest),
         board_name=_required_string(data, "board", manifest),
@@ -327,6 +335,7 @@ def generate_gowin_tcl(design: Design, board: Board, output_dir: Path) -> str:
             f"set_option -top_module {tcl_quote(design.top)}",
             "set_option -verilog_std sysv2017",
             f"set_option -use_sspi_as_gpio {int(board.use_sspi_as_gpio)}",
+            f"set_option -use_i2c_as_gpio {int(board.use_i2c_as_gpio)}",
             f"set_option -use_cpu_as_gpio {int(board.use_cpu_as_gpio)}",
             f"set_option -use_ready_as_gpio {int(board.use_ready_as_gpio)}",
             f"set_option -use_done_as_gpio {int(board.use_done_as_gpio)}",

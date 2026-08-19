@@ -1,0 +1,6 @@
+name = "008_sdram_burst"
+board = "tang_primer_25k"
+top = "top"
+sources = ["../../common/rtl/sdram_controller.sv", "../../common/sim/sdram_model.sv", "rtl/burst_test.sv", "rtl/top.sv"]
+constraints = ["../../common/constraints/tang_primer_25k_sdram.cst", "../../common/constraints/tang_primer_25k_sdram.sdc"]
+testbench = "sim/tb_top.sv"

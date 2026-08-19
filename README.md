@@ -4,7 +4,7 @@ Tang Primer 25K Core + Dockを、AI AgentからCLI中心で操作するための
 FPGA実験リポジトリです。各実験は独立したmanifestを持ち、同じコマンドで
 シミュレーション、Gowinビルド、実機書き込みを行います。
 
-番号付きの独立設計で、LED、ボタン、UART、PLL、オンチップBSRAMを
+番号付きの独立設計で、LED、ボタン、UART、PLL、オンチップBSRAM、外付けSDRAMを
 段階的に検証できます。
 
 ## 必要なもの
@@ -15,6 +15,7 @@ FPGA実験リポジトリです。各実験は独立したmanifestを持ち、�
 - Gowin Programmer（V1.9.11.03 Educationで動作確認）
 - Icarus Verilog（`iverilog`と`vvp`）
 - Tang Primer 25K Core + Dock、データ通信対応USB-Cケーブル
+- `006`以降ではSipeed Tang 40-pin SDRAMモジュールV1.2
 
 外部ツールはこのリポジトリに同梱しません。各公式配布元のライセンスと
 インストーラーに従って手動で導入してください。
@@ -62,6 +63,21 @@ $env:TANG_IVERILOG = 'C:\path\to\iverilog.exe'
 - `003_uart_tx`: オンボードUSB-UARTへ115200 baudで周期送信
 - `004_pll`: 50 MHzから100 MHzを生成しLOCKとheartbeatを表示
 - `005_bram`: 1024×16 bit BSRAMの起動時write/read BIST
+- `006_sdram_init`: 2個の32 MB SDRAMを初期化し、定期refreshを開始
+- `007_sdram_bist`: 固定値、walking-one、address patternで64 MB全域BIST
+- `008_sdram_burst`: SDRAMのBL8 write/readを1 burstずつ自己検証
+- `009_sdram_uart`: 全域BIST結果を115200 baudの機械可読行で送信
+
+SDRAM設計は50 MHz、16-bit data bus、CAS latency 2、burst length 8で動作します。
+`sdram_cs`は通常のactive-low chip-selectではなく、モジュール上の2個のSDRAMを
+選択する信号です。S1を押すと初期化から再実行します。007と009の既定BIST範囲は
+`4194304 burst × 8 word × 2 byte = 64 MB`です。
+
+009のUART出力例は次のとおりです。
+
+```text
+TEST 009_sdram_uart ... PASS errors=0x00000000 first=0x0000000
+```
 
 `program`はGowin純正`programmer_cli.exe`を使い、電源断で消えるSRAMへ
 `--device GW5A-25A --run 2`で書き込みます。不揮発Flash書き込みは誤操作を避けるため、
@@ -83,7 +99,7 @@ fpga.ps1                 PowerShell用の正式な入口
 ```
 
 設計manifestの公開スキーマは次のとおりです。未知のキー、存在しないファイル、
-ディレクトリ外を指すパスは処理開始前に拒否されます。
+設計ディレクトリまたは`common/`以外を指すパスは処理開始前に拒否されます。
 
 ```toml
 name = "001_blink"
@@ -123,7 +139,7 @@ python -m unittest discover -s tests -v
 
 1. 基盤と`001_blink`（完了）
 2. `002_button`、`003_uart_tx`、`004_pll`、`005_bram`（実装済み）
-3. `006_sdram_init`、`007_sdram_bist`、`008_sdram_burst`、`009_sdram_uart`
+3. `006_sdram_init`、`007_sdram_bist`、`008_sdram_burst`、`009_sdram_uart`（実装済み）
 4. FIFO、SPI、I2S、DDS、FIR/IIR、FFT、DMA、softcore
 5. 実験用のYosys + nextpnr-gowin + Apicula backend
 
@@ -131,5 +147,7 @@ python -m unittest discover -s tests -v
 
 - [Sipeed Tang Primer 25K](https://wiki.sipeed.com/hardware/en/tang/tang-primer-25k/primer-25k.html)
 - [Sipeed Tang Primer 25K examples](https://github.com/sipeed/TangPrimer-25K-example)
+- [Sipeed Tang 40-pin SDRAM module](https://wiki.sipeed.com/hardware/en/tang/tang-PMOD/FPGA_PMOD.html)
+- [Official Tang Primer 25K SDRAM example](https://github.com/ZiyangYE/LicheeTang25k_SDRAM)
 - [Gowin Software Tcl Commands](https://www.gowinsemi.com/upload/database_doc/3262/document/68b8a001a6a92.pdf)
 - [Gowin Programmer User Guide](https://cdn.gowinsemi.com.cn/SUG502E.pdf)

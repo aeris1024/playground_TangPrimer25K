@@ -1,0 +1,6 @@
+name = "009_sdram_uart"
+board = "tang_primer_25k"
+top = "top"
+sources = ["../../common/rtl/sdram_controller.sv", "../../common/rtl/sdram_bist.sv", "../../common/rtl/uart_tx.sv", "../../common/sim/sdram_model.sv", "rtl/bist_uart_reporter.sv", "rtl/top.sv"]
+constraints = ["../../common/constraints/tang_primer_25k_sdram.cst", "../../common/constraints/tang_primer_25k_sdram.sdc"]
+testbench = "sim/tb_top.sv"

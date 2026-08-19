@@ -29,7 +29,7 @@ class FpgaCliTests(unittest.TestCase):
             'name = "test_board"\ndevice = "TEST-PART"\ndevice_version = "A"\n'
             'clock_hz = 100\nprogrammer_device = "TEST-DEVICE"\n'
             'programmer_cable = "USB Debugger A"\nprogrammer_cable_index = 4\n'
-            'use_sspi_as_gpio = false\nuse_cpu_as_gpio = false\n'
+            'use_sspi_as_gpio = false\nuse_i2c_as_gpio = false\nuse_cpu_as_gpio = false\n'
             'use_ready_as_gpio = false\nuse_done_as_gpio = false\n',
             encoding="utf-8",
         )
@@ -47,7 +47,11 @@ class FpgaCliTests(unittest.TestCase):
         designs = fpga.discover_designs(MODULE_PATH.parents[1])
         self.assertEqual(
             set(designs),
-            {"001_blink", "002_button", "003_uart_tx", "004_pll", "005_bram"},
+            {
+                "001_blink", "002_button", "003_uart_tx", "004_pll", "005_bram",
+                "006_sdram_init", "007_sdram_bist", "008_sdram_burst",
+                "009_sdram_uart",
+            },
         )
         self.assertEqual(designs["001_blink"].top, "top")
 
@@ -64,6 +68,36 @@ class FpgaCliTests(unittest.TestCase):
             self.make_project(root)
             (root / "designs" / "001_test" / "rtl" / "top.sv").unlink()
             with self.assertRaisesRegex(fpga.FpgaError, "referenced file not found"):
+                fpga.discover_designs(root)
+
+    def test_common_source_is_allowed_but_other_escape_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_project(root)
+            common = root / "common" / "rtl"
+            common.mkdir(parents=True)
+            (common / "shared.sv").write_text("module shared; endmodule\n", encoding="utf-8")
+            manifest = root / "designs" / "001_test" / "design.toml"
+            text = manifest.read_text(encoding="utf-8")
+            manifest.write_text(
+                text.replace(
+                    'sources = ["rtl/top.sv"]',
+                    'sources = ["rtl/top.sv", "../../common/rtl/shared.sv"]',
+                ),
+                encoding="utf-8",
+            )
+            design = fpga.discover_designs(root)["001_test"]
+            self.assertIn((common / "shared.sv").resolve(), design.sources)
+
+            outside = root / "outside.sv"
+            outside.write_text("module outside; endmodule\n", encoding="utf-8")
+            manifest.write_text(
+                manifest.read_text(encoding="utf-8").replace(
+                    '"../../common/rtl/shared.sv"', '"../../outside.sv"'
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(fpga.FpgaError, "design directory or common"):
                 fpga.discover_designs(root)
 
     def test_environment_tool_override_has_priority(self) -> None:
@@ -84,6 +118,7 @@ class FpgaCliTests(unittest.TestCase):
         self.assertIn("-device_version {A}", text)
         self.assertIn("-force", text)
         self.assertIn("set_option -use_sspi_as_gpio 1", text)
+        self.assertIn("set_option -use_i2c_as_gpio 1", text)
         self.assertIn("set_option -use_cpu_as_gpio 1", text)
         self.assertIn("set_option -use_ready_as_gpio 1", text)
         self.assertIn("set_option -use_done_as_gpio 1", text)

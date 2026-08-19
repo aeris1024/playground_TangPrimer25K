@@ -13,10 +13,13 @@ Dock base board.
 - Dock READY LED pin used by `001_blink`: E8
 - Dock buttons used by `002_button`: S1=H11, S2=H10
 - Dock LEDs used by `002_button`: READY=E8, DONE=D7
+- Tang 40-pin SDRAM: shared 16-bit bus, two 32 MB devices, 64 MB total
+- SDRAM DQ12/DQ13 use the FPGA's I2C dual-purpose pins.
 - E2 is enabled as a regular GPIO by releasing its CPU/SSPI dual-purpose functions.
 - E8 is enabled as a regular GPIO by releasing its READY dual-purpose function.
 - D7 is enabled as a regular GPIO by releasing its DONE dual-purpose function.
+- B2/C2 are enabled as regular GPIOs by releasing their I2C dual-purpose function.
 
 The pin assignments are taken from Sipeed's official Tang Primer 25K example
-constraints. Design-specific constraints remain next to each design so that a
-design only constrains ports it actually uses.
+constraints. The common SDRAM constraint is shared by designs 006 through 009;
+other design-specific constraints remain next to each design.
