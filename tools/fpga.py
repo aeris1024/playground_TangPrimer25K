@@ -20,7 +20,7 @@ BOARDS_DIR = ROOT / "boards"
 BUILD_DIR = ROOT / "build"
 
 DESIGN_KEYS = {"name", "board", "top", "sources", "constraints", "testbench"}
-BOARD_KEYS = {"name", "device", "clock_hz", "programmer_board"}
+BOARD_KEYS = {"name", "device", "clock_hz", "programmer_device"}
 
 
 class FpgaError(RuntimeError):
@@ -32,7 +32,7 @@ class Board:
     name: str
     device: str
     clock_hz: int
-    programmer_board: str
+    programmer_device: str
     manifest: Path
 
 
@@ -56,8 +56,10 @@ class ToolSpec:
 
 TOOLS = {
     "gowin": ToolSpec("Gowin shell", "TANG_GOWIN_SH", ("gw_sh.exe", "gw_sh")),
-    "openfpgaloader": ToolSpec(
-        "openFPGALoader", "TANG_OPENFPGALOADER", ("openFPGALoader.exe", "openFPGALoader")
+    "programmer": ToolSpec(
+        "Gowin Programmer",
+        "TANG_GOWIN_PROGRAMMER",
+        ("programmer_cli.exe", "programmer_cli"),
     ),
     "iverilog": ToolSpec("Icarus Verilog", "TANG_IVERILOG", ("iverilog.exe", "iverilog")),
     "vvp": ToolSpec("Icarus runtime", None, ("vvp.exe", "vvp")),
@@ -119,7 +121,7 @@ def load_board(name: str, root: Path = ROOT) -> Board:
         name=_required_string(data, "name", manifest),
         device=_required_string(data, "device", manifest),
         clock_hz=clock_hz,
-        programmer_board=_required_string(data, "programmer_board", manifest),
+        programmer_device=_required_string(data, "programmer_device", manifest),
         manifest=manifest,
     )
     if board.name != name:
@@ -180,11 +182,36 @@ def _existing_executable(value: str | os.PathLike[str]) -> Path | None:
     return Path(found).resolve() if found else None
 
 
+def _gowin_roots() -> tuple[Path, ...]:
+    return (
+        Path("C:/Gowin"),
+        Path("C:/Program Files/Gowin"),
+        Path("C:/Program Files (x86)/Gowin"),
+        Path("D:/Tools/Gowin"),
+    )
+
+
 def _gowin_fallbacks() -> Iterable[Path]:
-    roots = (Path("C:/Gowin"), Path("C:/Program Files/Gowin"), Path("C:/Program Files (x86)/Gowin"))
+    roots = _gowin_roots()
     for root in roots:
         if root.is_dir():
-            yield from sorted(root.glob("**/IDE/bin/gw_sh.exe"), reverse=True)
+            candidates = root.glob("**/IDE/bin/gw_sh.exe")
+            yield from sorted(
+                candidates,
+                key=lambda path: ("education" in str(path).lower(), str(path).lower()),
+                reverse=True,
+            )
+
+
+def _programmer_fallbacks() -> Iterable[Path]:
+    for root in _gowin_roots():
+        if root.is_dir():
+            yield from sorted(root.glob("**/Programmer/bin/programmer_cli.exe"), reverse=True)
+
+
+def _iverilog_fallbacks(command: str) -> Iterable[Path]:
+    for root in (Path("C:/Tools/iverilog"), Path("D:/Tools/iverilog")):
+        yield root / "bin" / command
 
 
 def resolve_tool(key: str, environ: Mapping[str, str] | None = None) -> Path | None:
@@ -198,12 +225,25 @@ def resolve_tool(key: str, environ: Mapping[str, str] | None = None) -> Path | N
             return resolved
     if key == "gowin":
         return next((path.resolve() for path in _gowin_fallbacks() if path.is_file()), None)
+    if key == "programmer":
+        return next((path.resolve() for path in _programmer_fallbacks() if path.is_file()), None)
+    if key == "iverilog":
+        fallback = next(
+            (path.resolve() for path in _iverilog_fallbacks("iverilog.exe") if path.is_file()),
+            None,
+        )
+        if fallback:
+            return fallback
     if key == "vvp":
         iverilog = resolve_tool("iverilog", environ)
         if iverilog:
             sibling = iverilog.with_name("vvp.exe" if os.name == "nt" else "vvp")
             if sibling.is_file():
                 return sibling.resolve()
+        return next(
+            (path.resolve() for path in _iverilog_fallbacks("vvp.exe") if path.is_file()),
+            None,
+        )
     return None
 
 
@@ -241,12 +281,16 @@ def generate_gowin_tcl(design: Design, board: Board, output_dir: Path) -> str:
     return "\n".join(lines) + "\n"
 
 
-def program_command(executable: Path, board: Board, bitstream: Path, flash: bool) -> list[str]:
-    command = [str(executable), "-b", board.programmer_board]
-    if flash:
-        command.append("-f")
-    command.append(str(bitstream))
-    return command
+def program_command(executable: Path, board: Board, bitstream: Path) -> list[str]:
+    return [
+        str(executable),
+        "--device",
+        board.programmer_device,
+        "--run",
+        "2",
+        "--fsFile",
+        str(bitstream),
+    ]
 
 
 def _run(command: Sequence[str], cwd: Path, log: Path | None = None, timeout: int | None = None) -> int:
@@ -275,15 +319,30 @@ def command_list(_: argparse.Namespace) -> int:
     return 0
 
 
-def _version(path: Path, arguments: Sequence[str]) -> str:
+def _version(path: Path, arguments: Sequence[str]) -> tuple[bool, str]:
     try:
         result = subprocess.run(
             [str(path), *arguments], text=True, capture_output=True, timeout=10, check=False
         )
     except (OSError, subprocess.TimeoutExpired):
-        return "version unavailable"
+        return False, "version unavailable"
     output = ((result.stdout or "") + (result.stderr or "")).strip().splitlines()
-    return output[0] if output else "version unavailable"
+    return result.returncode == 0, output[0] if output else "version unavailable"
+
+
+def _programmer_version(path: Path) -> tuple[bool, str]:
+    try:
+        result = subprocess.run(
+            [str(path), "--help"], text=True, capture_output=True, timeout=10, check=False
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False, "version unavailable"
+    output = (result.stdout or "") + (result.stderr or "")
+    for line in output.splitlines():
+        if "Version V" in line:
+            return result.returncode == 0, line.strip()
+    first_line = next((line.strip() for line in output.splitlines() if line.strip()), "version unavailable")
+    return False, first_line
 
 
 def command_doctor(_: argparse.Namespace) -> int:
@@ -292,30 +351,35 @@ def command_doctor(_: argparse.Namespace) -> int:
     print(f"Board\tOK\t{board.device}\tclock={board.clock_hz} Hz")
     missing = False
     resolved: dict[str, Path] = {}
-    version_args = {"gowin": ("-version",), "openfpgaloader": ("--version",), "iverilog": ("-V",), "vvp": ("-V",)}
-    for key in ("gowin", "openfpgaloader", "iverilog", "vvp"):
+    version_args = {"gowin": ("-version",), "iverilog": ("-V",), "vvp": ("-V",)}
+    for key in ("gowin", "programmer", "iverilog", "vvp"):
         path = resolve_tool(key)
         if path:
-            resolved[key] = path
-            print(f"{TOOLS[key].label}\tOK\t{path}\t{_version(path, version_args[key])}")
+            usable, version = (
+                _programmer_version(path) if key == "programmer" else _version(path, version_args[key])
+            )
+            status = "OK" if usable else "FAIL"
+            print(f"{TOOLS[key].label}\t{status}\t{path}\t{version}")
+            if usable:
+                resolved[key] = path
+            else:
+                missing = True
         else:
             missing = True
             env_hint = f" ({TOOLS[key].env_var})" if TOOLS[key].env_var else ""
             print(f"{TOOLS[key].label}\tMISSING\tinstall it or configure PATH{env_hint}")
 
-    loader = resolved.get("openfpgaloader")
-    if loader:
-        print(f"Hardware\tCHECK\tprobing {board.programmer_board}...")
-        result = _run(
-            [str(loader), "-b", board.programmer_board, "--detect"], ROOT, timeout=15
-        )
+    programmer = resolved.get("programmer")
+    if programmer:
+        print(f"Hardware\tCHECK\tprobing {board.programmer_device} with Gowin Programmer...")
+        result = _run([str(programmer), "--scan"], ROOT, timeout=15)
         if result != 0:
             print("Hardware\tFAIL\tconnect the Dock directly by USB and check its driver/firmware")
             missing = True
         else:
             print("Hardware\tOK\tJTAG device detected")
     else:
-        print("Hardware\tSKIP\topenFPGALoader is unavailable")
+        print("Hardware\tSKIP\tGowin Programmer is unavailable")
     return 1 if missing else 0
 
 
@@ -367,11 +431,14 @@ def command_program(args: argparse.Namespace) -> int:
         raise FpgaError(
             f"Bitstream not found: {bitstream}. Run '.\\fpga.ps1 build {design.name}' first."
         )
-    loader = require_tool("openfpgaloader")
-    mode = "FLASH" if args.flash else "SRAM"
-    print(f"PROGRAM MODE\t{mode}")
+    if args.flash:
+        raise FpgaError(
+            "Flash programming is not enabled for the Gowin backend yet. Use SRAM programming without --flash."
+        )
+    programmer = require_tool("programmer")
+    print("PROGRAM MODE\tSRAM (Gowin Programmer)")
     log = BUILD_DIR / design.name / "program.log"
-    result = _run(program_command(loader, board, bitstream, args.flash), ROOT, log)
+    result = _run(program_command(programmer, board, bitstream), ROOT, log)
     if result != 0:
         raise FpgaError(
             f"Programming failed; see {log}. Check the USB cable, Dock firmware, and Windows driver."
@@ -439,7 +506,7 @@ def make_parser() -> argparse.ArgumentParser:
     program_parser = subparsers.add_parser("program", help="program a generated bitstream")
     program_parser.add_argument("design")
     program_parser.add_argument(
-        "--flash", action="store_true", help="write non-volatile flash instead of volatile SRAM"
+        "--flash", action="store_true", help="reserved; Gowin Flash programming is not enabled yet"
     )
     program_parser.set_defaults(handler=command_program)
 

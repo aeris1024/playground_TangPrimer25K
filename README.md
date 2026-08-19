@@ -10,8 +10,8 @@ FPGA実験リポジトリです。各実験は独立したmanifestを持ち、�
 
 - Windows 10/11
 - Python 3.11以上
-- Gowin EDA Education 1.9.9 Beta-4以上
-- openFPGALoader（`tangprimer25k`対応版）
+- Gowin EDA Education 1.9.9 Beta-4以上（ライセンス不要版）
+- Gowin Programmer（V1.9.12.03で動作確認）
 - Icarus Verilog（`iverilog`と`vvp`）
 - Tang Primer 25K Core + Dock、データ通信対応USB-Cケーブル
 
@@ -22,8 +22,8 @@ FPGA実験リポジトリです。各実験は独立したmanifestを持ち、�
 
 1. Gowin EDA Educationをインストールします。`gw_sh.exe`は通常、Gowinの
    インストール先にある`IDE\bin`へ配置されます。
-2. openFPGALoaderとIcarus Verilogをインストールし、それぞれの実行ファイルを
-   `PATH`へ追加します。
+2. Gowin ProgrammerとIcarus Verilogをインストールします。Gowin Programmerは
+   Gowin EDAのインストールツリーにある`Programmer\bin\programmer_cli.exe`を使います。
 3. Tang Primer 25K DockをUSBハブを介さずPCへ接続します。
 4. PowerShellで次を実行します。
 
@@ -35,7 +35,7 @@ FPGA実験リポジトリです。各実験は独立したmanifestを持ち、�
 
 ```powershell
 $env:TANG_GOWIN_SH = 'C:\path\to\Gowin\IDE\bin\gw_sh.exe'
-$env:TANG_OPENFPGALOADER = 'C:\path\to\openFPGALoader.exe'
+$env:TANG_GOWIN_PROGRAMMER = 'C:\path\to\Gowin\Programmer\bin\programmer_cli.exe'
 $env:TANG_IVERILOG = 'C:\path\to\iverilog.exe'
 ```
 
@@ -51,12 +51,9 @@ $env:TANG_IVERILOG = 'C:\path\to\iverilog.exe'
 .\fpga.ps1 clean 001_blink
 ```
 
-`program`の既定は電源断で消えるSRAM書き込みです。不揮発Flashへ書く場合だけ、
-意図を確認して次を実行してください。
-
-```powershell
-.\fpga.ps1 program 001_blink --flash
-```
+`program`はGowin純正`programmer_cli.exe`を使い、電源断で消えるSRAMへ
+`--device GW5A-25A --run 2`で書き込みます。不揮発Flash書き込みは誤操作を避けるため、
+現在のCLIでは無効です。
 
 `program`は自動でbuildしません。`build/001_blink/001_blink.fs`が存在しない場合は
 エラーになり、先に実行すべきbuildコマンドを表示します。
@@ -99,14 +96,16 @@ python -m unittest discover -s tests -v
 ## トラブルシュート
 
 - `MISSING`: 対象ツールを`PATH`へ追加するか、上記の`TANG_*`環境変数を設定します。
+- `Gowin shell FAIL`と`License verification failed`: Standard版Gowin EDAにはライセンスが
+  必要です。ライセンス不要のEducation版へ入れ替えるか、Standard版のライセンスを設定します。
 - JTAGデバイスを検出できない: USBハブを外し、データ対応ケーブル、Dockの電源、
   オンボードデバッガのファームウェアを確認します。
-- WindowsでopenFPGALoaderがFTDIを開けない: Gowin Programmer用ドライバと
-  WinUSB/libusb系ドライバが競合している可能性があります。使用するprogrammerに
-  合うドライバへ切り替えます。Gowin Programmerは手動フォールバックです。
+- Gowin Programmerがデバイスを検出できない: DockをUSBハブなしで接続し、電源、
+  データ対応USBケーブル、Gowin付属FTDIドライバを確認します。`programmer_cli.exe --scan`
+  を直接実行しても切り分けできます。
 - Gowin build後に`.fs`が見つからない: `build/<design>/build.log`と生成された
   Gowinプロジェクトを確認し、デバイス型番とtop moduleが正しいことを確認します。
-- Flash書き込みは初期動作確認には不要です。まずSRAM書き込みで確認してください。
+- Flash書き込みは初期動作確認には不要で、現在は未対応です。まずSRAM書き込みで確認してください。
 
 ## ロードマップ
 
@@ -121,4 +120,4 @@ python -m unittest discover -s tests -v
 - [Sipeed Tang Primer 25K](https://wiki.sipeed.com/hardware/en/tang/tang-primer-25k/primer-25k.html)
 - [Sipeed Tang Primer 25K examples](https://github.com/sipeed/TangPrimer-25K-example)
 - [Gowin Software Tcl Commands](https://www.gowinsemi.com/upload/database_doc/3262/document/68b8a001a6a92.pdf)
-- [openFPGALoader](https://github.com/trabucayre/openFPGALoader)
+- [Gowin Programmer User Guide](https://cdn.gowinsemi.com.cn/SUG502E.pdf)

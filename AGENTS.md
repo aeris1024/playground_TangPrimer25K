@@ -16,8 +16,8 @@ Run commands in this order and stop on the first failure:
 ```
 
 - Prefer CLI output and logs over driving the Gowin GUI.
-- Never use `program --flash` unless the user explicitly requests persistent
-  programming. Normal validation uses volatile SRAM.
+- `program` uses Gowin Programmer operation 2 for volatile SRAM. Flash
+  programming is intentionally disabled until a board-specific flow is tested.
 - Do not claim hardware success without a successful programmer exit and a
   user-observed LED/UART/result signal.
 - Treat missing external tools or disconnected hardware as an environment

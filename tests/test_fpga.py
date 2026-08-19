@@ -24,7 +24,7 @@ class FpgaCliTests(unittest.TestCase):
         (design_dir / "sim").mkdir()
         board_dir.mkdir(parents=True)
         (board_dir / "board.toml").write_text(
-            'name = "test_board"\ndevice = "TEST-PART"\nclock_hz = 100\nprogrammer_board = "test"\n',
+            'name = "test_board"\ndevice = "TEST-PART"\nclock_hz = 100\nprogrammer_device = "TEST-DEVICE"\n',
             encoding="utf-8",
         )
         (design_dir / "rtl" / "top.sv").write_text("module top; endmodule\n", encoding="utf-8")
@@ -76,16 +76,21 @@ class FpgaCliTests(unittest.TestCase):
         self.assertIn("run all", text)
         self.assertIn("{C:/build folder/gowin_project}", text)
 
-    def test_program_command_defaults_to_sram(self) -> None:
+    def test_program_command_uses_gowin_sram_mode(self) -> None:
         board = fpga.load_board("tang_primer_25k")
-        command = fpga.program_command(Path("openFPGALoader.exe"), board, Path("blink.fs"), False)
-        self.assertEqual(command, ["openFPGALoader.exe", "-b", "tangprimer25k", "blink.fs"])
-        self.assertNotIn("-f", command)
-
-    def test_program_command_requires_explicit_flash(self) -> None:
-        board = fpga.load_board("tang_primer_25k")
-        command = fpga.program_command(Path("openFPGALoader.exe"), board, Path("blink.fs"), True)
-        self.assertEqual(command[-2:], ["-f", "blink.fs"])
+        command = fpga.program_command(Path("programmer_cli.exe"), board, Path("blink.fs"))
+        self.assertEqual(
+            command,
+            [
+                "programmer_cli.exe",
+                "--device",
+                "GW5A-25A",
+                "--run",
+                "2",
+                "--fsFile",
+                "blink.fs",
+            ],
+        )
 
     def test_targeted_clean_preserves_other_designs(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -5,7 +5,7 @@ Dock base board.
 
 - FPGA device: `GW5A-LV25MG121NC1/I0`
 - Dock oscillator: 27 MHz
-- openFPGALoader board name: `tangprimer25k`
+- Gowin Programmer device name: `GW5A-25A`
 - Clock pin used by `001_blink`: E2
 - On-board LED pin used by `001_blink`: L6
 
