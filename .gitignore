@@ -1,0 +1,25 @@
+# Generated FPGA build products
+/build/*
+!/build/.gitkeep
+
+# Python caches and test artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Simulation output
+*.vcd
+*.fst
+*.vvp
+
+# Gowin-generated projects and bitstreams
+*.gprj
+*.fs
+*.fi
+*.log
+
+# Local editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

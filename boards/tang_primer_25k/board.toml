@@ -1,0 +1,4 @@
+name = "tang_primer_25k"
+device = "GW5A-LV25MG121NC1/I0"
+clock_hz = 27000000
+programmer_board = "tangprimer25k"
