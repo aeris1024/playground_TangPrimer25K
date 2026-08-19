@@ -464,7 +464,7 @@ def clean_outputs(build_dir: Path, design_name: str | None, clean_all: bool) -> 
             removed.append(resolved)
     if clean_all:
         build_root.mkdir(parents=True, exist_ok=True)
-        (build_root / ".gitkeep").touch()
+        (build_root / ".gitkeep").write_bytes(b"\n")
     return removed
 
 
