@@ -69,7 +69,9 @@ DockのREADY/DONE LEDはactive-highで、FPGA出力が`1`のとき点灯しま�
 - `008_sdram_burst`: BL1/CAS3の8 word連続write/readを自己検証し、実測値をUART表示
 - `009_sdram_uart`: 全域BIST結果を115200 baudの機械可読行で送信
 
-SDRAM設計は50 MHz、16-bit data bus、CAS latency 2、burst length 8で動作します。
+SDRAM設計は16-bit data bus、CAS latency 3、burst length 1で動作します。
+`006_sdram_init`は50 MHz、`007_sdram_bist`・`008_sdram_burst`・`009_sdram_uart`は
+25 MHzを使います。データ転送は8個の連続word commandを1回の論理transactionとして扱います。
 `sdram_cs`は通常のactive-low chip-selectではなく、モジュール上の2個のSDRAMを
 選択する信号です。S1を押すと初期化から再実行します。007と009の既定BIST範囲は
 `4194304 burst × 8 word × 2 byte = 64 MB`です。
