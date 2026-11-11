@@ -22,12 +22,12 @@ module tb_top;
         repeat (100) begin
             @(posedge clk);
             #1;
-            if (led_done === 1'b0) begin
+            if (led_done === 1'b1) begin
                 $display("TEST 005_bram ... FAIL (BIST mismatch at address %0d)",
                          dut.address);
                 $fatal(1);
             end
-            if (led_ready === 1'b0) begin
+            if (led_ready === 1'b1) begin
                 $display("TEST 005_bram ... PASS");
                 $finish;
             end

@@ -55,6 +55,7 @@ $env:TANG_IVERILOG = 'C:\path\to\iverilog.exe'
 
 ボタン入力の実験は設計名を`002_button`へ置き換えて同じ順序で実行します。
 書き込み後は、S1がREADY LED、S2がDONE LEDを押している間だけ点灯させます。
+DockのREADY/DONE LEDはactive-highで、FPGA出力が`1`のとき点灯します。
 
 実装済み設計は次のとおりです。
 
@@ -65,7 +66,7 @@ $env:TANG_IVERILOG = 'C:\path\to\iverilog.exe'
 - `005_bram`: 1024×16 bit BSRAMの起動時write/read BIST
 - `006_sdram_init`: 2個の32 MB SDRAMを初期化し、定期refreshを開始
 - `007_sdram_bist`: 固定値、walking-one、address patternで64 MB全域BIST
-- `008_sdram_burst`: SDRAMのBL8 write/readを1 burstずつ自己検証
+- `008_sdram_burst`: BL1/CAS3の8 word連続write/readを自己検証し、実測値をUART表示
 - `009_sdram_uart`: 全域BIST結果を115200 baudの機械可読行で送信
 
 SDRAM設計は50 MHz、16-bit data bus、CAS latency 2、burst length 8で動作します。

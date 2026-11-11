@@ -16,7 +16,8 @@ module burst_test (
     output reg         done,
     output reg         pass,
     output reg         fail,
-    output reg  [3:0]  beats_seen
+    output reg  [3:0]  beats_seen,
+    output reg  [127:0] read_words
 );
     localparam [2:0] WAIT_INIT = 3'd0, WRITE_ISSUE = 3'd1,
                      WRITE_WAIT = 3'd2, READ_ISSUE = 3'd3,
@@ -40,12 +41,23 @@ module burst_test (
             beats_seen <= 4'd0;
             previous_read_valid <= 1'b0;
             mismatch <= 1'b0;
+            read_words <= 128'd0;
         end else begin
             if (read_valid) begin
                 if (beats_seen != 0 && !previous_read_valid)
                     mismatch <= 1'b1;
                 if (read_data !== 16'hb000 + read_index)
                     mismatch <= 1'b1;
+                case (read_index)
+                    3'd0: read_words[15:0] <= read_data;
+                    3'd1: read_words[31:16] <= read_data;
+                    3'd2: read_words[47:32] <= read_data;
+                    3'd3: read_words[63:48] <= read_data;
+                    3'd4: read_words[79:64] <= read_data;
+                    3'd5: read_words[95:80] <= read_data;
+                    3'd6: read_words[111:96] <= read_data;
+                    default: read_words[127:112] <= read_data;
+                endcase
                 beats_seen <= beats_seen + 1'b1;
             end
             previous_read_valid <= read_valid;

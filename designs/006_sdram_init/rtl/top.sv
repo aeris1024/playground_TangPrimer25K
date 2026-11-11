@@ -53,9 +53,9 @@ module top #(
         .sdram_dq(sdram_dq)
     );
 
-    // Dock LEDs are active low: READY means initialized, DONE pulses off only
+    // Dock LEDs are active high: READY means initialized, DONE pulses off only
     // while the controller is servicing a refresh.
-    assign led_ready = ~init_done;
-    assign led_done = ~(init_done && !controller_busy);
+    assign led_ready = init_done;
+    assign led_done = init_done && !controller_busy;
     assign uart_tx = 1'b1;
 endmodule

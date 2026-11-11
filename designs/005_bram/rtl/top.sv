@@ -53,6 +53,6 @@ module top #(
         endcase
     end
 
-    assign led_ready = ~(state == PASS);
-    assign led_done = ~(state == FAIL);
+    assign led_ready = (state == PASS);
+    assign led_done = (state == FAIL);
 endmodule

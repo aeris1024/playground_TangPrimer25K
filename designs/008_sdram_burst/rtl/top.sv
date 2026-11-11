@@ -1,4 +1,6 @@
 module top #(
+    parameter integer CLOCK_HZ = 50_000_000,
+    parameter integer BAUD_RATE = 115_200,
     parameter integer INIT_WAIT_CYCLES = 10_000,
     parameter integer REFRESH_INTERVAL_CYCLES = 350
 ) (
@@ -16,15 +18,25 @@ module top #(
     wire [1:0] write_mask;
     wire read_valid, test_done, test_pass, test_fail;
     wire [3:0] beats_seen;
+    wire [127:0] read_words;
+    wire uart_busy, uart_start;
+    wire [7:0] uart_data;
+    wire report_done;
+    reg memory_clk = 1'b0;
     reg [2:0] reset_pipe = 3'b000;
     wire system_reset = reset_button || !reset_pipe[2];
-    always @(posedge clk) reset_pipe <= {reset_pipe[1:0], 1'b1};
+    localparam integer MEMORY_REFRESH_INTERVAL =
+        REFRESH_INTERVAL_CYCLES < 4 ? 2 : REFRESH_INTERVAL_CYCLES / 2;
+    always @(posedge clk) begin
+        reset_pipe <= {reset_pipe[1:0], 1'b1};
+        memory_clk <= ~memory_clk;
+    end
 
     sdram_controller #(
         .INIT_WAIT_CYCLES(INIT_WAIT_CYCLES),
-        .REFRESH_INTERVAL_CYCLES(REFRESH_INTERVAL_CYCLES)
+        .REFRESH_INTERVAL_CYCLES(MEMORY_REFRESH_INTERVAL)
     ) controller (
-        .clk(clk), .reset(system_reset), .cmd_valid(cmd_valid),
+        .clk(memory_clk), .reset(system_reset), .cmd_valid(cmd_valid),
         .cmd_ready(cmd_ready), .cmd_write(cmd_write), .cmd_address(cmd_address),
         .write_data(write_data), .write_mask(write_mask), .write_index(write_index),
         .read_valid(read_valid), .read_data(read_data), .read_index(read_index),
@@ -36,16 +48,26 @@ module top #(
     );
 
     burst_test test_engine (
-        .clk(clk), .reset(system_reset), .init_done(init_done),
+        .clk(memory_clk), .reset(system_reset), .init_done(init_done),
         .cmd_valid(cmd_valid), .cmd_ready(cmd_ready), .cmd_write(cmd_write),
         .cmd_address(cmd_address), .write_index(write_index),
         .write_data(write_data), .write_mask(write_mask),
         .read_valid(read_valid), .read_data(read_data), .read_index(read_index),
         .cmd_done(cmd_done), .done(test_done), .pass(test_pass), .fail(test_fail),
-        .beats_seen(beats_seen)
+        .beats_seen(beats_seen), .read_words(read_words)
     );
 
-    assign led_ready = ~test_pass;
-    assign led_done = ~test_fail;
-    assign uart_tx = 1'b1;
+    burst_uart_reporter reporter (
+        .clk(clk), .reset(system_reset), .test_done(test_done),
+        .test_pass(test_pass), .read_words(read_words), .uart_busy(uart_busy),
+        .uart_start(uart_start), .uart_data(uart_data), .report_done(report_done)
+    );
+
+    uart_tx #(.CLOCK_HZ(CLOCK_HZ), .BAUD_RATE(BAUD_RATE)) serial (
+        .clk(clk), .start(uart_start), .data(uart_data),
+        .tx(uart_tx), .busy(uart_busy)
+    );
+
+    assign led_ready = test_pass;
+    assign led_done = test_fail;
 endmodule

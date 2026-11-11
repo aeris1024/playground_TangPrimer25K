@@ -28,15 +28,21 @@ module top #(
     wire [31:0] error_count;
     wire [24:0] first_error_address;
     wire [3:0] progress;
+    reg memory_clk = 1'b0;
     reg [2:0] reset_pipe = 3'b000;
     wire system_reset = reset_button || !reset_pipe[2];
-    always @(posedge clk) reset_pipe <= {reset_pipe[1:0], 1'b1};
+    localparam integer MEMORY_REFRESH_INTERVAL =
+        REFRESH_INTERVAL_CYCLES < 4 ? 2 : REFRESH_INTERVAL_CYCLES / 2;
+    always @(posedge clk) begin
+        reset_pipe <= {reset_pipe[1:0], 1'b1};
+        memory_clk <= ~memory_clk;
+    end
 
     sdram_controller #(
         .INIT_WAIT_CYCLES(INIT_WAIT_CYCLES),
-        .REFRESH_INTERVAL_CYCLES(REFRESH_INTERVAL_CYCLES)
+        .REFRESH_INTERVAL_CYCLES(MEMORY_REFRESH_INTERVAL)
     ) controller (
-        .clk(clk), .reset(system_reset),
+        .clk(memory_clk), .reset(system_reset),
         .cmd_valid(cmd_valid), .cmd_ready(cmd_ready), .cmd_write(cmd_write),
         .cmd_address(cmd_address), .write_data(write_data),
         .write_mask(write_mask), .write_index(write_index),
@@ -49,7 +55,7 @@ module top #(
     );
 
     sdram_bist #(.TOTAL_BURSTS(TOTAL_BURSTS)) bist (
-        .clk(clk), .reset(system_reset), .init_done(init_done),
+        .clk(memory_clk), .reset(system_reset), .init_done(init_done),
         .cmd_valid(cmd_valid), .cmd_ready(cmd_ready), .cmd_write(cmd_write),
         .cmd_address(cmd_address), .write_index(write_index),
         .write_data(write_data), .write_mask(write_mask),
@@ -59,7 +65,7 @@ module top #(
         .progress(progress)
     );
 
-    assign led_ready = ~bist_pass;
-    assign led_done = ~bist_fail;
+    assign led_ready = bist_pass;
+    assign led_done = bist_fail;
     assign uart_tx = 1'b1;
 endmodule

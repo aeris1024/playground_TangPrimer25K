@@ -19,7 +19,7 @@ module tb_top;
         for (pattern = 0; pattern < 4; pattern = pattern + 1) begin
             {button_s2, button_s1} = pattern[1:0];
             #1;
-            if (led_ready !== ~button_s1 || led_done !== ~button_s2) begin
+            if (led_ready !== button_s1 || led_done !== button_s2) begin
                 $display(
                     "TEST 002_button ... FAIL (buttons=%b%b leds=%b%b)",
                     button_s2,

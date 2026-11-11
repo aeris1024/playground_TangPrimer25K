@@ -30,7 +30,8 @@ module tb_top;
         repeat (300) begin
             @(posedge clk); #1;
             if (dut.init_done) begin
-                if (!model_init_ok || led_ready !== 1'b0 || refresh_count < 16) begin
+                if (!model_init_ok || led_ready !== 1'b1 ||
+                    led_done !== 1'b1 || refresh_count < 16) begin
                     $display("TEST 006_sdram_init ... FAIL (bad initialization sequence)");
                     $fatal(1);
                 end

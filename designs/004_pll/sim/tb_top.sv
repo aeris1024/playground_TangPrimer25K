@@ -37,7 +37,7 @@ module tb_top;
         previous_ready = led_ready;
         wait (dut.pll_locked === 1'b1);
         #1;
-        if (led_done !== 1'b0) begin
+        if (led_done !== 1'b1) begin
             $display("TEST 004_pll ... FAIL (LOCK LED is off)");
             $fatal(1);
         end

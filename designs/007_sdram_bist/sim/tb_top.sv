@@ -33,9 +33,11 @@ module tb_top;
         repeat (20_000) begin
             @(posedge clk); #1;
             if (dut.bist_done) begin
-                if (!dut.bist_pass || dut.bist_fail || dut.error_count != 0 ||
-                    !model_init_ok || write_bursts != TEST_BURSTS + 20 ||
-                    read_bursts != TEST_BURSTS + 20) begin
+                if (!dut.bist_pass || dut.bist_fail ||
+                    led_ready !== 1'b1 || led_done !== 1'b0 ||
+                    dut.error_count != 0 ||
+                    !model_init_ok || write_bursts != 8 * (TEST_BURSTS + 20) ||
+                    read_bursts != 8 * (TEST_BURSTS + 20)) begin
                     $display("TEST 007_sdram_bist ... FAIL (errors=%0d wr=%0d rd=%0d)",
                              dut.error_count, write_bursts, read_bursts);
                     $fatal(1);

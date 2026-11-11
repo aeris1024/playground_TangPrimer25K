@@ -53,7 +53,9 @@ module tb_top;
             end
         end
         @(posedge clk); #1;
-        if (!dut.report_done || !dut.bist_pass || dut.error_count != 0) begin
+        if (!dut.report_done || !dut.bist_pass || dut.bist_fail ||
+            led_ready !== 1'b1 || led_done !== 1'b0 ||
+            dut.error_count != 0) begin
             $display("TEST 009_sdram_uart ... FAIL (report status)"); $fatal(1);
         end
         $display("TEST 009_sdram_uart ... PASS");

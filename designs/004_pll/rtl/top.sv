@@ -31,6 +31,6 @@ module top #(
         end
     end
 
-    assign led_done = ~pll_locked;
-    assign led_ready = ~(pll_locked & heartbeat);
+    assign led_done = pll_locked;
+    assign led_ready = pll_locked & heartbeat;
 endmodule

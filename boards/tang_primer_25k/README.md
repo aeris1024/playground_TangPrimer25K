@@ -13,6 +13,7 @@ Dock base board.
 - Dock READY LED pin used by `001_blink`: E8
 - Dock buttons used by `002_button`: S1=H11, S2=H10
 - Dock LEDs used by `002_button`: READY=E8, DONE=D7
+- Dock READY and DONE LEDs are active high (FPGA output `1` lights the LED).
 - Tang 40-pin SDRAM: shared 16-bit bus, two 32 MB devices, 64 MB total
 - SDRAM DQ12/DQ13 use the FPGA's I2C dual-purpose pins.
 - E2 is enabled as a regular GPIO by releasing its CPU/SSPI dual-purpose functions.

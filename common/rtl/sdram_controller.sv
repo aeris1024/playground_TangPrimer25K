@@ -1,4 +1,6 @@
-// Simple fixed-BL8 controller for the Sipeed Tang 40-pin 64 MB SDRAM module.
+// Eight-word transaction controller for the Sipeed Tang 40-pin 64 MB SDRAM
+// module. The physical SDRAM uses BL1/CAS3, matching Sipeed's proven Primer
+// 25K controller; eight consecutive word commands form one logical transfer.
 // The module exposes one 16-bit bus; sdram_cs selects either 32 MB device.
 module sdram_controller #(
     parameter integer INIT_WAIT_CYCLES = 10_000,
@@ -8,7 +10,7 @@ module sdram_controller #(
     parameter integer T_RC_CYCLES = 4,
     parameter integer T_MRD_CYCLES = 2,
     parameter integer T_WR_CYCLES = 2,
-    parameter integer CAS_LATENCY = 2
+    parameter integer CAS_LATENCY = 3
 ) (
     input  wire        clk,
     input  wire        reset,
@@ -69,8 +71,8 @@ module sdram_controller #(
         CMD_READ    = 3'b101,
         CMD_NOP     = 3'b111;
 
-    // BL=8, sequential, CAS=2, standard write burst.
-    localparam [12:0] MODE_REGISTER = 13'h023;
+    // BL=1, sequential, CAS=3, single-location write burst.
+    localparam [12:0] MODE_REGISTER = 13'h130;
 
     reg [4:0] state = ST_INIT_WAIT;
     reg [31:0] wait_count = 32'd0;
@@ -80,6 +82,7 @@ module sdram_controller #(
     reg transaction_write = 1'b0;
     reg [24:0] transaction_address = 25'd0;
     reg [2:0] beat_index = 3'd0;
+    reg [3:0] read_issue_index = 4'd0;
     reg dq_output_enable = 1'b0;
     reg [15:0] dq_output = 16'h0000;
 
@@ -124,6 +127,7 @@ module sdram_controller #(
             sdram_ba <= 2'b00;
             sdram_dqm <= 2'b11;
             beat_index <= 3'd0;
+            read_issue_index <= 4'd0;
         end else begin
             if (init_done && refresh_count < REFRESH_INTERVAL_CYCLES)
                 refresh_count <= refresh_count + 1'b1;
@@ -222,7 +226,7 @@ module sdram_controller #(
                     sdram_cs <= transaction_address[24];
                     sdram_ba <= transaction_address[10:9];
                     sdram_addr[8:0] <= transaction_address[8:0];
-                    sdram_addr[10] <= 1'b1;
+                    sdram_addr[10] <= 1'b0;
                     sdram_dqm <= write_mask;
                     beat_index <= 3'd0;
                     if (transaction_write) begin
@@ -233,14 +237,23 @@ module sdram_controller #(
                         beat_index <= 3'd1;
                     end else begin
                         issue_command(CMD_READ);
-                        wait_count <= CAS_LATENCY - 1;
+                        // The READ command edge itself is CAS cycle one.
+                        // Enter the capture state so the first word is sampled
+                        // immediately after the CAS_LATENCY-th SDRAM edge.
+                        wait_count <= CAS_LATENCY - 2;
+                        read_issue_index <= 4'd1;
                         state <= ST_READ_LATENCY;
                     end
                 end
 
                 ST_WRITE_DATA: begin
+                    sdram_cs <= transaction_address[24];
+                    sdram_ba <= transaction_address[10:9];
+                    sdram_addr[8:0] <= transaction_address[8:0] + beat_index;
+                    sdram_addr[10] <= beat_index == 3'd7;
                     sdram_dqm <= write_mask;
                     dq_output <= write_data;
+                    issue_command(CMD_WRITE);
                     if (beat_index == 3'd7) begin
                         state <= ST_WRITE_RELEASE;
                     end else begin
@@ -264,6 +277,17 @@ module sdram_controller #(
                 end
 
                 ST_READ_LATENCY: begin
+                    // SDR SDRAM read DQM has a two-cycle latency. Keep both
+                    // bytes enabled until every requested word has emerged.
+                    sdram_dqm <= 2'b00;
+                    if (read_issue_index < 8) begin
+                        sdram_cs <= transaction_address[24];
+                        sdram_ba <= transaction_address[10:9];
+                        sdram_addr[8:0] <= transaction_address[8:0] + read_issue_index[2:0];
+                        sdram_addr[10] <= read_issue_index == 7;
+                        issue_command(CMD_READ);
+                        read_issue_index <= read_issue_index + 1'b1;
+                    end
                     if (wait_count == 0) begin
                         beat_index <= 3'd0;
                         state <= ST_READ_DATA;
@@ -273,6 +297,15 @@ module sdram_controller #(
                 end
 
                 ST_READ_DATA: begin
+                    sdram_dqm <= 2'b00;
+                    if (read_issue_index < 8) begin
+                        sdram_cs <= transaction_address[24];
+                        sdram_ba <= transaction_address[10:9];
+                        sdram_addr[8:0] <= transaction_address[8:0] + read_issue_index[2:0];
+                        sdram_addr[10] <= read_issue_index == 7;
+                        issue_command(CMD_READ);
+                        read_issue_index <= read_issue_index + 1'b1;
+                    end
                     read_data <= sdram_dq;
                     read_valid <= 1'b1;
                     read_index <= beat_index;

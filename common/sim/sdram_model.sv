@@ -1,10 +1,10 @@
 `ifdef __ICARUS__
 // Compact behavioral model for controller-level tests. It models the command
-// protocol and BL8 transfers, while intentionally storing only a configurable
+// protocol and BL1/CAS3 transfers, while intentionally storing only a configurable
 // window from each 32 MB device.
 module sdram_model #(
     parameter integer WORDS_PER_CHIP = 4096,
-    parameter integer CAS_LATENCY = 2
+    parameter integer CAS_LATENCY = 3
 ) (
     input  wire        sdram_clk,
     input  wire        sdram_cs,
@@ -50,8 +50,13 @@ module sdram_model #(
     reg [8:0] read_column = 9'd0;
     reg [3:0] read_remaining = 4'd0;
     reg [3:0] read_delay = 4'd0;
+    reg read_pipe_valid [0:CAS_LATENCY-2];
+    reg [15:0] read_pipe_data [0:CAS_LATENCY-2];
+    reg [1:0] dqm_delay_0 = 2'b11;
+    reg [1:0] dqm_delay_1 = 2'b11;
 
     integer i;
+    integer pipe_index;
     integer index_value;
 
     assign sdram_dq = dq_output_enable ? dq_output : 16'hzzzz;
@@ -76,38 +81,24 @@ module sdram_model #(
         refresh_by_chip[1] = 0;
         for (i = 0; i < 2*WORDS_PER_CHIP; i = i + 1)
             memory[i] = 16'hxxxx;
+        for (i = 0; i < CAS_LATENCY - 1; i = i + 1) begin
+            read_pipe_valid[i] = 1'b0;
+            read_pipe_data[i] = 16'hxxxx;
+        end
     end
 
     always @(posedge sdram_clk) begin
-        dq_output_enable <= 1'b0;
-
-        if (write_active) begin
-            index_value = memory_index(write_chip, write_bank, write_row, write_column);
-            if (!sdram_dqm[0]) memory[index_value][7:0] <= sdram_dq[7:0];
-            if (!sdram_dqm[1]) memory[index_value][15:8] <= sdram_dq[15:8];
-            write_column <= write_column + 1'b1;
-            write_remaining <= write_remaining - 1'b1;
-            if (write_remaining == 1) begin
-                write_active <= 1'b0;
-                row_open[{write_chip, write_bank}] <= 1'b0;
-            end
+        // Read DQM takes effect two clocks after it is sampled.
+        dq_output_enable <= read_pipe_valid[CAS_LATENCY-2] &&
+                            dqm_delay_1 != 2'b11;
+        dq_output <= read_pipe_data[CAS_LATENCY-2];
+        dqm_delay_1 <= dqm_delay_0;
+        dqm_delay_0 <= sdram_dqm;
+        for (pipe_index = CAS_LATENCY - 2; pipe_index > 0; pipe_index = pipe_index - 1) begin
+            read_pipe_valid[pipe_index] <= read_pipe_valid[pipe_index - 1];
+            read_pipe_data[pipe_index] <= read_pipe_data[pipe_index - 1];
         end
-
-        if (read_active) begin
-            if (read_delay != 0) begin
-                read_delay <= read_delay - 1'b1;
-            end else if (read_remaining != 0) begin
-                index_value = memory_index(read_chip, read_bank, read_row, read_column);
-                dq_output <= memory[index_value];
-                dq_output_enable <= 1'b1;
-                read_column <= read_column + 1'b1;
-                read_remaining <= read_remaining - 1'b1;
-                if (read_remaining == 1) begin
-                    read_active <= 1'b0;
-                    row_open[{read_chip, read_bank}] <= 1'b0;
-                end
-            end
-        end
+        read_pipe_valid[0] <= 1'b0;
 
         case ({sdram_ras_n, sdram_cas_n, sdram_we_n})
             CMD_PRE: begin
@@ -122,7 +113,8 @@ module sdram_model #(
                 refresh_count <= refresh_count + 1'b1;
             end
             CMD_MRS: begin
-                if (sdram_addr[6:4] == CAS_LATENCY && sdram_addr[2:0] == 3'b011)
+                if (sdram_addr[8] && sdram_addr[6:4] == CAS_LATENCY &&
+                    sdram_addr[2:0] == 3'b000)
                     mode_loaded[sdram_cs] <= 1'b1;
             end
             CMD_ACT: begin
@@ -139,27 +131,23 @@ module sdram_model #(
                 );
                 if (!sdram_dqm[0]) memory[index_value][7:0] <= sdram_dq[7:0];
                 if (!sdram_dqm[1]) memory[index_value][15:8] <= sdram_dq[15:8];
-                write_chip <= sdram_cs;
-                write_bank <= sdram_ba;
-                write_row <= open_row[{sdram_cs, sdram_ba}];
-                write_column <= sdram_addr[8:0] + 1'b1;
-                write_remaining <= 4'd7;
-                write_active <= 1'b1;
                 write_burst_count <= write_burst_count + 1'b1;
+                if (sdram_addr[10])
+                    row_open[{sdram_cs, sdram_ba}] <= 1'b0;
             end
             CMD_READ: begin
                 if (!row_open[{sdram_cs, sdram_ba}]) begin
                     $display("SDRAM MODEL ERROR: READ without ACTIVATE");
                     $fatal(1);
                 end
-                read_chip <= sdram_cs;
-                read_bank <= sdram_ba;
-                read_row <= open_row[{sdram_cs, sdram_ba}];
-                read_column <= sdram_addr[8:0];
-                read_remaining <= 4'd8;
-                read_delay <= CAS_LATENCY - 1;
-                read_active <= 1'b1;
+                index_value = memory_index(
+                    sdram_cs, sdram_ba, open_row[{sdram_cs, sdram_ba}], sdram_addr[8:0]
+                );
+                read_pipe_valid[0] <= 1'b1;
+                read_pipe_data[0] <= memory[index_value];
                 read_burst_count <= read_burst_count + 1'b1;
+                if (sdram_addr[10])
+                    row_open[{sdram_cs, sdram_ba}] <= 1'b0;
             end
             default: begin end
         endcase

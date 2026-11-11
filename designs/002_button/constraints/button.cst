@@ -1,4 +1,4 @@
-// Tang Primer 25K Dock buttons (active-high) and status LEDs (active-low).
+// Tang Primer 25K Dock buttons and status LEDs are active high.
 IO_LOC "button_s1" H11;
 IO_PORT "button_s1" IO_TYPE=LVCMOS33 PULL_MODE=DOWN DRIVE=OFF BANK_VCCIO=3.3;
 

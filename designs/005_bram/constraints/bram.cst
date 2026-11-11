@@ -1,4 +1,4 @@
-// 50 MHz oscillator and active-low Dock status LEDs.
+// 50 MHz oscillator and active-high Dock status LEDs.
 IO_LOC "clk" E2;
 IO_PORT "clk" IO_TYPE=LVCMOS33 PULL_MODE=DOWN DRIVE=OFF BANK_VCCIO=3.3;
 

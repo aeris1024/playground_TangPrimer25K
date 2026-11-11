@@ -1,4 +1,5 @@
 // Tang Primer 25K Dock + Sipeed Tang 40-pin SDRAM module V1.2.
+// Dock READY and DONE status LEDs are active high.
 IO_LOC "clk" E2;
 IO_PORT "clk" IO_TYPE=LVCMOS33 PULL_MODE=NONE BANK_VCCIO=3.3;
 IO_LOC "reset_button" H11;
