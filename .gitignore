@@ -23,3 +23,15 @@ __pycache__/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local environment files and credentials (examples may be committed)
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.lic
+license.dat
+id_rsa
+id_ed25519

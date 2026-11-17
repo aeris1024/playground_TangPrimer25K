@@ -5,10 +5,13 @@ DockのオンボードUSB-UARTへ、115200 baud・8N1で`FPGA UART TX\r\n`を
 8 data bits、no parity、1 stop bitで開きます。
 
 ```powershell
+.\fpga.ps1 doctor
 .\fpga.ps1 sim 003_uart_tx
 .\fpga.ps1 build 003_uart_tx
 .\fpga.ps1 program 003_uart_tx
 ```
+
+リポジトリのルートから順に実行し、最初の失敗で止めてください。
 
 テストベンチはクロックとbaud rateを短縮し、UARTフレームを復号してメッセージ、
 start bit、stop bitを自己検証します。

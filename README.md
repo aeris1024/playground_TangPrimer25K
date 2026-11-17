@@ -1,33 +1,46 @@
 # Tang Primer 25K FPGA Playground
 
-Tang Primer 25K Core + Dockを、AI AgentからCLI中心で操作するためのWindows向け
-FPGA実験リポジトリです。各実験は独立したmanifestを持ち、同じコマンドで
+Tang Primer 25K Core + Dockで、LEDから外付けSDRAMまで段階的に学ぶ
+Windows向けFPGA実験リポジトリです。PowerShellからCLI中心で操作でき、
+各実験は独立したmanifestを持ち、同じコマンドで
 シミュレーション、Gowinビルド、実機書き込みを行います。
 
 番号付きの独立設計で、LED、ボタン、UART、PLL、オンチップBSRAM、外付けSDRAMを
 段階的に検証できます。
 
+学習・実験用のプロジェクトです。各設計の実装とテストベンチを公開していますが、
+すべてのボード・ツールバージョンでの動作を保証するものではありません。
+Sipeed / Gowinの公式プロジェクトではありません。
+
+- [実験一覧](#実験一覧) / [セットアップ](#windowsセットアップ) / [トラブルシュート](#トラブルシュート)
+- [開発・貢献ガイド](CONTRIBUTING.md) / [ロードマップ](docs/ROADMAP.md)
+- [ライセンス](LICENSE) / [外部ツール・参考元](THIRD_PARTY_NOTICES.md)
+
 ## 必要なもの
 
 - Windows 10/11
 - Python 3.11以上
-- Gowin EDA Education 1.9.9 Beta-4以上（ライセンス不要版）
-- Gowin Programmer（V1.9.11.03 Educationで動作確認）
+- Gowin EDA Education（既存の開発環境: 1.9.9 Beta-4）
+- Gowin Programmer（既存の開発環境: V1.9.11.03 Education）
 - Icarus Verilog（`iverilog`と`vvp`）
 - Tang Primer 25K Core + Dock、データ通信対応USB-Cケーブル
 - `006`以降ではSipeed Tang 40-pin SDRAMモジュールV1.2
 
 外部ツールはこのリポジトリに同梱しません。各公式配布元のライセンスと
 インストーラーに従って手動で導入してください。
+上記バージョンは開発時の記録です。別バージョンを利用する場合は`doctor`と各検証で
+互換性を確認してください。CLIとその単体テストはPython標準ライブラリのみを使います。
 
 ## Windowsセットアップ
 
-1. Gowin EDA Educationをインストールします。`gw_sh.exe`は通常、Gowinの
+1. このリポジトリをcloneまたはZIPで取得し、PowerShellでルートディレクトリを開きます。
+2. Python 3.11以上をインストールし、`python --version`が成功することを確認します。
+3. Gowin EDA Educationをインストールします。`gw_sh.exe`は通常、Gowinの
    インストール先にある`IDE\bin`へ配置されます。
-2. Gowin ProgrammerとIcarus Verilogをインストールします。Gowin Programmerは
+4. Gowin ProgrammerとIcarus Verilogをインストールします。Gowin Programmerは
    Gowin EDAのインストールツリーにある`Programmer\bin\programmer_cli.exe`を使います。
-3. Tang Primer 25K DockをUSBハブを介さずPCへ接続します。
-4. PowerShellで次を実行します。
+5. Tang Primer 25K DockをUSBハブを介さずPCへ接続します。
+6. PowerShellで次を実行します。
 
 ```powershell
 .\fpga.ps1 doctor
@@ -47,27 +60,39 @@ $env:TANG_IVERILOG = 'C:\path\to\iverilog.exe'
 
 ```powershell
 .\fpga.ps1 list
+.\fpga.ps1 doctor
 .\fpga.ps1 sim 001_blink
 .\fpga.ps1 build 001_blink
 .\fpga.ps1 program 001_blink
-.\fpga.ps1 clean 001_blink
 ```
+
+上記はコマンドの実行順です。各コマンドの終了コードを確認し、失敗したらそこで止めて
+原因を解消してください。`doctor`はツールの起動に加え、接続されたJTAGデバイスも調べます。
+`program`成功後、READY LEDの約1 Hzの点滅を目で確認して実機確認完了とします。
+生成物の削除には`.\fpga.ps1 clean 001_blink`を使います。
 
 ボタン入力の実験は設計名を`002_button`へ置き換えて同じ順序で実行します。
 書き込み後は、S1がREADY LED、S2がDONE LEDを押している間だけ点灯させます。
 DockのREADY/DONE LEDはactive-highで、FPGA出力が`1`のとき点灯します。
 
-実装済み設計は次のとおりです。
+## 実験一覧
 
-- `001_blink`: READY LEDを約1 Hzで点滅
-- `002_button`: S1/S2をREADY/DONE LEDへ反映
-- `003_uart_tx`: オンボードUSB-UARTへ115200 baudで周期送信
-- `004_pll`: 50 MHzから100 MHzを生成しLOCKとheartbeatを表示
-- `005_bram`: 1024×16 bit BSRAMの起動時write/read BIST
-- `006_sdram_init`: 2個の32 MB SDRAMを初期化し、定期refreshを開始
-- `007_sdram_bist`: 固定値、walking-one、address patternで64 MB全域BIST
-- `008_sdram_burst`: BL1/CAS3の8 word連続write/readを自己検証し、実測値をUART表示
-- `009_sdram_uart`: 全域BIST結果を115200 baudの機械可読行で送信
+設計名はCLIの`.\fpga.ps1 list`で確認できます。公開の設計探索入口は
+各ディレクトリの`design.toml`です。各リンクに動作・観測方法をまとめています。
+
+| 設計 | 内容 | 追加ハードウェア |
+| --- | --- | --- |
+| [001_blink](designs/001_blink/README.md) | READY LEDを約1 Hzで点滅 | なし |
+| [002_button](designs/002_button/README.md) | S1/S2をREADY/DONE LEDへ反映 | なし |
+| [003_uart_tx](designs/003_uart_tx/README.md) | USB-UARTへ115200 baudで周期送信 | なし |
+| [004_pll](designs/004_pll/README.md) | 50 MHzから100 MHzを生成しLOCKとheartbeatを表示 | なし |
+| [005_bram](designs/005_bram/README.md) | 1024×16 bit BSRAMの起動時write/read BIST | なし |
+| [006_sdram_init](designs/006_sdram_init/README.md) | 2個の32 MB SDRAMを初期化し定期refreshを開始 | SDRAMモジュール |
+| [007_sdram_bist](designs/007_sdram_bist/README.md) | 固定値・walking-one・address patternで64 MB全域BIST | SDRAMモジュール |
+| [008_sdram_burst](designs/008_sdram_burst/README.md) | 8 word連続write/readとUARTによる実測値表示 | SDRAMモジュール |
+| [009_sdram_uart](designs/009_sdram_uart/README.md) | 全域BIST結果を機械可読なUART行で送信 | SDRAMモジュール |
+
+### SDRAM設計について
 
 SDRAM設計は16-bit data bus、CAS latency 3、burst length 1で動作します。
 `006_sdram_init`は50 MHz、`007_sdram_bist`・`008_sdram_burst`・`009_sdram_uart`は
@@ -97,6 +122,7 @@ common/                  複数の実験で再利用するRTLとシミュレー�
 designs/<name>/          独立した実験、design.toml、RTL、制約、testbench
 tools/fpga.py            Python標準ライブラリだけで実装したCLI
 tests/                   CLIの単体テスト
+docs/                    ロードマップと公開前チェック
 build/                   追跡しない生成物
 fpga.ps1                 PowerShell用の正式な入口
 ```
@@ -122,11 +148,18 @@ python -m unittest discover -s tests -v
 ```
 
 実機を含む推奨検証順序は`doctor`、`sim`、`build`、`program`です。
-書き込み後に内蔵LEDが約1 Hzで点滅すれば初期マイルストーン完了です。
+CLIの単体テスト、RTLシミュレーション、Gowinビルド、実機観測は別の検証です。
+単体テストやシミュレーションのPASSだけでは実機動作を確認したことにはなりません。
+PLLシミュレーションは動作モデル、SDRAMシミュレーションは範囲を縮小したモデルを使い、
+実デバイスの電気特性や全容量の実機テストを代替しません。
 
 ## トラブルシュート
 
 - `MISSING`: 対象ツールを`PATH`へ追加するか、上記の`TANG_*`環境変数を設定します。
+- `python.exe`が起動しない: `python --version`と`Get-Command python`を確認します。
+  Windowsのアプリ実行エイリアスが選択される場合は、実際のPythonのインストール先を
+  `PATH`で優先してください。`py -3 --version`が使える場合は、
+  `py -3 tools/fpga.py doctor`でも診断できます。
 - `Gowin shell FAIL`と`License verification failed`: Standard版Gowin EDAにはライセンスが
   必要です。ライセンス不要のEducation版へ入れ替えるか、Standard版のライセンスを設定します。
 - JTAGデバイスを検出できない: USBハブを外し、データ対応ケーブル、Dockの電源、
@@ -140,17 +173,24 @@ python -m unittest discover -s tests -v
 
 ## ロードマップ
 
-1. 基盤と`001_blink`（完了）
-2. `002_button`、`003_uart_tx`、`004_pll`、`005_bram`（実装済み）
-3. `006_sdram_init`、`007_sdram_bist`、`008_sdram_burst`、`009_sdram_uart`（実装済み）
-4. FIFO、SPI、I2S、DDS、FIR/IIR、FFT、DMA、softcore
-5. 実験用のYosys + nextpnr-gowin + Apicula backend
+`001`〜`009`は実装済みです。今後の実験候補と検証方針は
+[ロードマップ](docs/ROADMAP.md)を参照してください。
+
+## ライセンスと貢献
+
+本リポジトリのコード・ドキュメントは[MIT License](LICENSE)で公開します。
+外部ツール・デバイスライブラリ・参考元の権利と利用条件はそれぞれの提供元に帰属します。
+詳細は[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)を参照してください。
+
+不具合報告や実験の追加は歓迎します。[CONTRIBUTING.md](CONTRIBUTING.md)に
+検証手順、設計の追加方法、ログを共有する際の注意をまとめています。
+メンテナー向けの[公開前チェック](docs/PUBLISHING.md)も用意しています。
 
 ## 参考資料
 
 - [Sipeed Tang Primer 25K](https://wiki.sipeed.com/hardware/en/tang/tang-primer-25k/primer-25k.html)
 - [Sipeed Tang Primer 25K examples](https://github.com/sipeed/TangPrimer-25K-example)
 - [Sipeed Tang 40-pin SDRAM module](https://wiki.sipeed.com/hardware/en/tang/tang-PMOD/FPGA_PMOD.html)
-- [Official Tang Primer 25K SDRAM example](https://github.com/ZiyangYE/LicheeTang25k_SDRAM)
+- [ZiyangYE / LicheeTang25k_SDRAM](https://github.com/ZiyangYE/LicheeTang25k_SDRAM)
 - [Gowin Software Tcl Commands](https://www.gowinsemi.com/upload/database_doc/3262/document/68b8a001a6a92.pdf)
 - [Gowin Programmer User Guide](https://cdn.gowinsemi.com.cn/SUG502E.pdf)
